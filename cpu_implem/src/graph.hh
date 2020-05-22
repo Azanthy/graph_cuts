@@ -11,7 +11,7 @@
 
 class Graph {
 public:
-    Graph(char *path);
+    Graph(char *img, char *seeds);
 
 private:
     std::vector<Node> nodes;

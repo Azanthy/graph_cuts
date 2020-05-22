@@ -5,6 +5,6 @@
 #include "node.hh"
 
 Node::Node() {
-    weight_snk = 0.f;
-    weight_src = 0.f
+//    this->weight_snk = 0;
+//    this->weight_src = 0;
 }
