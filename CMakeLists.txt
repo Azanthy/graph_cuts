@@ -8,4 +8,6 @@ set(CMAKE_BUILD_TYPE Debug)
 
 add_executable(graph_cuts
         cpu_implem/src/main.cc
+        cpu_implem/src/node.cc
+        cpu_implem/src/graph.cc
         )

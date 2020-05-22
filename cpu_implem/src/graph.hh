@@ -14,11 +14,12 @@ public:
     Graph(char *img, char *seeds);
 
 private:
+    void normalize_histo(size_t *bck_histo, size_t *obj_histo, float **norm_bck_histo, float **norm_obj_histo);
+
+
     std::vector<Node> nodes;
     int width_;
     int height_;
-    size_t bck_histo[256];
-    size_t obj_histo[64];
 
 };
 
