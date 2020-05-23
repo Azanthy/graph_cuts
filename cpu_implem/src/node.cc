@@ -3,8 +3,3 @@
 //
 
 #include "node.hh"
-
-Node::Node() {
-//    this->weight_snk = 0;
-//    this->weight_src = 0;
-}

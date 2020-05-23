@@ -8,10 +8,15 @@
 
 class Node {
 public:
-    Node();
+    Node(char gray_val)
+        : _gray_val(gray_val)
+        , _weight_src(-1)
+        , _weight_snk(-1)
+    {};
 
-    float weight_snk;
-    float weight_src;
+    char _gray_val;
+    float _weight_snk;
+    float _weight_src;
 
     // Neighbor;
 

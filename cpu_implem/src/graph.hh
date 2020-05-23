@@ -7,6 +7,7 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 #include "node.hh"
 
 class Graph {
@@ -14,12 +15,12 @@ public:
     Graph(char *img, char *seeds);
 
 private:
-    void normalize_histo(size_t *bck_histo, size_t *obj_histo, float **norm_bck_histo, float **norm_obj_histo);
+    void normalize_histo(size_t *bck_histo, size_t *obj_histo, float **norm_bck_histo, float **norm_obj_histo, float *sum_bck_histo, float *sum_obj_histo);
 
 
-    std::vector<Node> nodes;
-    int width_;
-    int height_;
+    std::vector<std::shared_ptr<Node>> _nodes;
+    int _width;
+    int _height;
 
 };
 
