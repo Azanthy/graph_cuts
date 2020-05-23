@@ -16,6 +16,8 @@ public:
     void push(int x, int y);
     void relabel(int x, int y);
     bool is_active(int x, int y);
+    bool any_active();
+    void print();
 
 private:
     void normalize_histo(size_t *bck_histo, size_t *obj_histo, float **norm_bck_histo, float **norm_obj_histo, float *sum_bck_histo, float *sum_obj_histo);

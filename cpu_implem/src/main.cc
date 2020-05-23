@@ -9,4 +9,6 @@ int main(int argc, char *argv[])
         exit(-1);
     }
     auto graph = Graph(argv[1], argv[2]);
+    graph.max_flow();
+    graph.print();
 }

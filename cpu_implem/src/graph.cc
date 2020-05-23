@@ -3,6 +3,8 @@
 //
 
 #include <cmath>
+#include <iostream>
+#include <fstream>
 
 #include "graph.hh"
 
@@ -10,6 +12,7 @@
 #include "stb_image.h"
 
 #define HISTO_FACTOR 4
+#define HEIGHT_MAX 5
 #define DISTANCE(x,y) std::exp(-std::abs(x - y)/255.f)
 
 Graph::Graph(char *img, char *seeds) {
@@ -23,11 +26,9 @@ Graph::Graph(char *img, char *seeds) {
 
     this->_size = this->_width * this->_height;
     this->_heights = std::vector<int>(this->_size, 0);
+    for (auto i=0; i <4; i++)
+        this->_neighbors[i] = std::vector<float>(this->_size,0.f);
     this->_excess_flow = std::vector<float>(this->_size,0.f);
-    this->_neighbors[0] = std::vector<float>(this->_size,0.f);
-    this->_neighbors[1] = std::vector<float>(this->_size,0.f);
-    this->_neighbors[2] = std::vector<float>(this->_size,0.f);
-    this->_neighbors[3] = std::vector<float>(this->_size,0.f);
 
     auto grays = std::vector<int>(this->_size, 0);
 
@@ -126,7 +127,7 @@ void Graph::initialize_node_capacities(int x, int y, std::vector<int> &grays) {
 
 void Graph::max_flow()
 {
-    while (_nb_active) {
+    while (any_active()) {
         for (auto y = 0; y < this->_height; y++)
             for (auto x = 0; x < this->_width; x++)
                 relabel(x, y);
@@ -134,6 +135,19 @@ void Graph::max_flow()
             for (auto x = 0; x < this->_width; x++)
                 push(x, y);
     }
+    auto nb_pos = 0;
+    auto nb_neg = 0;
+    for (auto y = 0; y < this->_height; y++) {
+        for (auto x = 0; x < this->_width; x++) {
+            if (_excess_flow[y*_width+x] > 0.f)
+                nb_pos++;
+            else
+                nb_neg++;
+        }
+    }
+    std::cout << "Active node: "<<nb_pos<<std::endl;
+    std::cout << "Non-Active node: "<<nb_neg<<std::endl;
+    std::cout << "Total node: "<<_size<<std::endl;
 }
 
 void Graph::push(int x, int y) {
@@ -145,6 +159,8 @@ void Graph::push(int x, int y) {
         auto idx_nghb = (y + this->y_nghb[i]) * _width + (x + this->x_nghb[i]);
         if (y + y_nghb[i] < 0 || y + y_nghb[i] >= _height ||
             x + x_nghb[i] < 0 || x + x_nghb[i] >= _width)
+            continue;
+        if (this->_heights[idx_nghb] != this->_heights[idx_curr] - 1)
             continue;
         // Pushed flow
         float flow = std::min(this->_neighbors[i][idx_curr], this->_excess_flow[idx_curr]);
@@ -158,9 +174,46 @@ void Graph::push(int x, int y) {
 }
 
 void Graph::relabel(int x, int y) {
-
+    if (!is_active(x, y))
+        return;
+    auto idx_curr = y * this->_width + x;
+    auto tmp_height = HEIGHT_MAX;
+    for (auto i = 0; i < 4; i++) {
+        auto idx_nghb = (y + this->y_nghb[i]) * _width + (x + this->x_nghb[i]);
+        if (this->_neighbors[i][idx_curr] > 0.f)
+            tmp_height = std::min(tmp_height, this->_heights[idx_nghb] + 1);
+    }
+    this->_heights[idx_curr] = tmp_height;
 }
-bool Graph::is_active(int x, int y) {
-    return true;
 
+bool Graph::is_active(int x, int y) {
+    auto idx = y * this->_width + x;
+    return this->_excess_flow[idx] > 0.f && this->_heights[idx] < HEIGHT_MAX;
+}
+
+bool Graph::any_active() {
+    for (auto y = 0; y < this->_height; y++)
+        for (auto x = 0; x < this->_width; x++)
+        if (is_active(x, y))
+            return true;
+    return false;
+}
+
+void Graph::print() {
+    std::ofstream file;
+    file.open("output.pmm");
+
+    file << "P3\n" << this->_width << " "<< this->_height << "\n255\n";
+    for (int y = 0; y < this->_height; y++)
+    {
+        for (int x = 0; x < this->_width; x++)
+        {
+            auto flow = this->_excess_flow[y*_width +x];
+            if (flow > 0.f)
+                file << "255 255 255 ";
+            else
+                file << "0 0 0 ";
+        }
+        file << "\n";
+    }
 }
