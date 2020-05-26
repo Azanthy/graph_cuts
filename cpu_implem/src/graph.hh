@@ -12,6 +12,7 @@
 class Graph {
 public:
     Graph(char *img, char *seeds);
+    ~Graph();
     void max_flow();
     void push(int x, int y);
     void relabel(int x, int y);
@@ -20,7 +21,7 @@ public:
     void print();
 
 private:
-    void normalize_histo(size_t *bck_histo, size_t *obj_histo, float **norm_bck_histo, float **norm_obj_histo, float *sum_bck_histo, float *sum_obj_histo);
+    void normalize_histo(size_t **bck_histo, size_t **obj_histo, float **norm_bck_histo, float **norm_obj_histo, float *sum_bck_histo, float *sum_obj_histo);
     void initialize_node_capacities(int x, int y, std::vector<int> &grays);
 
 
@@ -28,6 +29,7 @@ private:
     int _height;
     int _size;
     unsigned int _nb_active;
+    unsigned char *_img;
 
     std::vector<int> _heights;
     std::vector<float> _excess_flow;
