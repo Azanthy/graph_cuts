@@ -85,8 +85,16 @@ Graph::Graph(char *img, char *seeds) {
         }
     }
 
-    delete norm_bck_histo;
-    delete norm_obj_histo;
+    for (auto i=0; i<3;i++){
+        delete[] bck_histo[i];
+        delete[] obj_histo[i];
+        delete[] norm_bck_histo[i];
+        delete[] norm_obj_histo[i];
+    }
+    delete[] bck_histo;
+    delete[] obj_histo;
+    delete[] norm_bck_histo;
+    delete[] norm_obj_histo;
     stbi_image_free(labels);
 }
 
