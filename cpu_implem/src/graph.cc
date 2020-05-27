@@ -13,8 +13,9 @@
 
 #define HISTO_FACTOR 4
 #define HEIGHT_MAX 5
-#define DISTANCE(x,y) std::exp(-std::abs(x - y)/255.f)
-#define BIN_VAL(hist, data, i) hist[0][data[i]/4] * hist[1][data[i+1]/4] * hist[2][data[i+2]/4]
+#define MANHATTAN(data, i, j)   std::abs(data[i]-data[j]) + std::abs(data[i+1]-data[j+1]) + std::abs(data[i+2]-data[j+2])
+#define DISTANCE(data, i, j)    std::exp(-MANHATTAN(data, i, j)/255.f) //TODO grayscale -> rgb
+#define BIN_VAL(hist, data, i)  (hist[0][data[i]/4] + hist[1][data[i+1]/4] + hist[2][data[i+2]/4]) / 3.f
 
 Graph::Graph(char *img, char *seeds) {
     // Load image
@@ -39,8 +40,6 @@ Graph::Graph(char *img, char *seeds) {
     this->_excess_flow = std::vector<float>(this->_size,0.f);
     for (auto i=0; i < 4; i++)
         this->_neighbors[i] = std::vector<float>(this->_size,0.f);
-
-    auto grays = std::vector<int>(this->_size, 0);
 
     // Initialize nodes and histograms
     for (auto y = 0; y < this->_height; y++) {
@@ -81,7 +80,7 @@ Graph::Graph(char *img, char *seeds) {
             }
 
             // Initialize neighbors capacities
-            initialize_node_capacities(x, y, grays);
+            initialize_node_capacities(x, y);
         }
     }
 
@@ -130,13 +129,13 @@ void Graph::normalize_histo(size_t **bck_histo, size_t **obj_histo, float **norm
     return;
 }
 
-void Graph::initialize_node_capacities(int x, int y, std::vector<int> &grays) {
+void Graph::initialize_node_capacities(int x, int y) {
     auto idx_curr = y * this->_width + x;
     for (auto i = 0; i < 4; i++) {
         auto idx_nghb = (y + this->y_nghb[i]) * _width + (x + this->x_nghb[i]);
         if (y + y_nghb[i] >= 0 && y + y_nghb[i] < _height &&
             x + x_nghb[i] >= 0 && x + x_nghb[i] < _width)
-            this->_neighbors[i][idx_curr] = DISTANCE(grays[idx_curr], grays[idx_nghb]);
+            this->_neighbors[i][idx_curr] = DISTANCE(this->_img, idx_curr*3, idx_nghb*3);
     }
 }
 
@@ -154,7 +153,7 @@ void Graph::max_flow()
     auto nb_neg = 0;
     for (auto y = 0; y < this->_height; y++) {
         for (auto x = 0; x < this->_width; x++) {
-            if (_heights[y*_width+x] == HEIGHT_MAX)
+            if (_heights[y*_width+x] == this->_size)
                 nb_pos++;
             else
                 nb_neg++;
@@ -192,7 +191,7 @@ void Graph::relabel(int x, int y) {
     if (!is_active(x, y))
         return;
     auto idx_curr = y * this->_width + x;
-    auto tmp_height = HEIGHT_MAX;
+    auto tmp_height = this->_size;
     for (auto i = 0; i < 4; i++) {
         auto idx_nghb = (y + this->y_nghb[i]) * _width + (x + this->x_nghb[i]);
         if (this->_neighbors[i][idx_curr] > 0.f)
@@ -203,7 +202,7 @@ void Graph::relabel(int x, int y) {
 
 bool Graph::is_active(int x, int y) {
     auto idx = y * this->_width + x;
-    return this->_excess_flow[idx] > 0.f && this->_heights[idx] < HEIGHT_MAX;
+    return this->_excess_flow[idx] > 0.f && this->_heights[idx] < this->_size;
 }
 
 bool Graph::any_active() {
@@ -225,7 +224,7 @@ void Graph::print() {
         {
             auto n_idx = y * this->_width * 3 + x * 3;
             auto flow = this->_excess_flow[y*_width +x];
-            if (_heights[y*_width+x] == HEIGHT_MAX)
+            if (_heights[y*_width+x] == this->_size)
                 file << int(_img[n_idx]) << " " << int(_img[n_idx+1]) << " "<< int(_img[n_idx+2]) << " ";
             else
                 file << "0 0 0 ";

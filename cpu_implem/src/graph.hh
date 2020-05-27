@@ -22,7 +22,7 @@ public:
 
 private:
     void normalize_histo(size_t **bck_histo, size_t **obj_histo, float **norm_bck_histo, float **norm_obj_histo, float *sum_bck_histo, float *sum_obj_histo);
-    void initialize_node_capacities(int x, int y, std::vector<int> &grays);
+    void initialize_node_capacities(int x, int y);
 
 
     int _width;
