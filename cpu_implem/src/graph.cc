@@ -12,7 +12,7 @@
 #include "stb_image.h"
 
 #define HISTO_FACTOR 4
-#define HEIGHT_MAX 5
+#define HEIGHT_MAX 50
 #define MANHATTAN(data, i, j)   std::abs(data[i]-data[j]) + std::abs(data[i+1]-data[j+1]) + std::abs(data[i+2]-data[j+2])
 #define DISTANCE(data, i, j)    std::exp(-MANHATTAN(data, i, j)/255.f) //TODO grayscale -> rgb
 #define BIN_VAL(hist, data, i)  (hist[0][data[i]/4] + hist[1][data[i+1]/4] + hist[2][data[i+2]/4]) / 3.f
@@ -64,8 +64,7 @@ Graph::Graph(char *img, char *seeds) {
     // Compute histograms for external capacities
     float sum_bck_histo = 0;
     float sum_obj_histo = 0;
-    normalize_histo(bck_histo, obj_histo, norm_bck_histo, norm_obj_histo,
-                    &sum_bck_histo, &sum_obj_histo);
+    normalize_histo(bck_histo, obj_histo, norm_bck_histo, norm_obj_histo);
 
     //Can be parallelize easily
     for (auto y = 0; y < this->_height; y++) {
@@ -74,11 +73,11 @@ Graph::Graph(char *img, char *seeds) {
             auto n_idx = y * this->_width * n + x * n;
 
             // Initialize external capacities if not on seeds
-            if (this->_excess_flow[idx] == 0.f) {
+            // if (this->_excess_flow[idx] == 0.f) {
                 float weight_snk = 1.f - std::exp(-BIN_VAL(norm_bck_histo, data, n_idx));
                 float weight_src = 1.f - std::exp(-BIN_VAL(norm_obj_histo, data, n_idx));
                 this->_excess_flow[idx] = weight_src - weight_snk;
-            }
+            // }
 
             // Initialize neighbors capacities
             initialize_node_capacities(x, y);
@@ -104,7 +103,7 @@ Graph::~Graph()
 }
 
 void Graph::normalize_histo(size_t **bck_histo, size_t **obj_histo, float **norm_bck_histo,
-    float **norm_obj_histo, float *sum_bck_histo, float *sum_obj_histo) {
+    float **norm_obj_histo) {
     size_t bck_max[3] = {0, 0, 0};
     size_t obj_max[3] = {0, 0, 0};
 
@@ -121,9 +120,6 @@ void Graph::normalize_histo(size_t **bck_histo, size_t **obj_histo, float **norm
         for (auto j = 0; j < 3; j++) {
             norm_bck_histo[j][i] = bck_histo[j][i] / float(bck_max[j]);
             norm_obj_histo[j][i] = obj_histo[j][i] / float(obj_max[j]);
-
-            *sum_bck_histo += norm_bck_histo[j][i];
-            *sum_obj_histo += norm_obj_histo[j][i];
         }
     }
 
@@ -147,7 +143,7 @@ void Graph::initialize_node_capacities(int x, int y) {
 void Graph::max_flow()
 {
     while (any_active()) {
-        auto tmp_heights = std::vector<int>(this->_size, 0);
+        auto tmp_heights = std::vector<int>(this->_heights);
         for (auto y = 0; y < this->_height; y++)
             for (auto x = 0; x < this->_width; x++)
                 relabel(x, y, tmp_heights);
@@ -234,7 +230,7 @@ void Graph::print() {
         {
             auto n_idx = y * this->_width * 3 + x * 3;
             auto flow = this->_excess_flow[y*_width +x];
-            if (_heights[y*_width+x] == HEIGHT_MAX)
+            if (_excess_flow[y*_width+x] > 0.f)
                 file << int(_img[n_idx]) << " " << int(_img[n_idx+1]) << " "<< int(_img[n_idx+2]) << " ";
             else
                 file << "0 0 0 ";
