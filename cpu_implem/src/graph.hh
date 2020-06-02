@@ -15,7 +15,7 @@ public:
     ~Graph();
     void max_flow();
     void push(int x, int y);
-    void relabel(int x, int y);
+    void relabel(int x, int y, std::vector<int> &heights);
     bool is_active(int x, int y);
     bool any_active();
     void print();
