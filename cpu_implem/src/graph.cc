@@ -168,15 +168,15 @@ void Graph::initialize_node_capacities(int x, int y) {
         auto idx_nghb = (y + this->y_nghb[i]) * _width + (x + this->x_nghb[i]);
         if (y + y_nghb[i] >= 0 && y + y_nghb[i] < _height &&
             x + x_nghb[i] >= 0 && x + x_nghb[i] < _width) {
-            if (_labels[idx_nghb*3])
+            this->_neighbors[i][idx_curr] = gradient(idx_curr*3, idx_nghb*3);
+            if (_labels[idx_nghb*3] > 220)
                 this->_neighbors[i][idx_curr] = 0;
-            if (_labels[idx_nghb*3+2])
+            if (_labels[idx_nghb*3+2] > 200)
                 this->_neighbors[i][idx_curr] = 255;
             // auto norm =std::abs(this->_img[idx_curr*3] - this->_img[idx_nghb*3]) +
             //            std::abs(this->_img[idx_curr*3+1] - this->_img[idx_nghb*3+1]) +
             //            std::abs(this->_img[idx_curr*3+2] - this->_img[idx_nghb*3+2]);
             // this->_neighbors[i][idx_curr] = -std::log(std::exp(-norm / 384.f));
-            this->_neighbors[i][idx_curr] = gradient(idx_curr*3, idx_nghb*3);
         }
     }
 }
