@@ -37,12 +37,13 @@ Graph::Graph(char *img, char *seeds) {
     }
 
     this->_img = data;
+    this->_labels = labels;
     this->_size = this->_width * this->_height;
     this->_binary = std::vector<bool>(this->_size, false);
     this->_heights = std::vector<int>(this->_size, 0);
-    this->_excess_flow = std::vector<float>(this->_size, 0);
+    this->_excess_flow = std::vector<int>(this->_size, 0);
     for (auto i=0; i < 4; i++)
-        this->_neighbors[i] = std::vector<float>(this->_size, 0);
+        this->_neighbors[i] = std::vector<int>(this->_size, 0);
     this->_dfs = std::queue<int>();
 
     int total_obj = 0;
@@ -109,16 +110,16 @@ Graph::Graph(char *img, char *seeds) {
             float weight_snk = gradient(n_idx, mean_bck);
 
             this->_excess_flow[idx] = weight_src - weight_snk;
+            // if (labels[n_idx] > 220) {
+            //     this->_excess_flow[idx] = 0;
+            // }
+            // if (labels[n_idx+2] > 220) {
+            //     this->_excess_flow[idx] = 255;
+            // }
+
         }
     }
 
-    // std::cout << "HEIGHTS\n";
-    // for (auto y = 0; y < this->_height; y++) {
-    //     for (auto x = 0; x < this->_width; x++) {
-    //         std::cout << this->_excess_flow[y*_width+x] << " ";
-    //     }
-    //     std::cout << "\n";
-    // }
     for (auto i=0; i<3;i++){
         delete[] bck_histo[i];
         delete[] obj_histo[i];
@@ -129,12 +130,12 @@ Graph::Graph(char *img, char *seeds) {
     delete[] obj_histo;
     delete[] norm_bck_histo;
     delete[] norm_obj_histo;
-    stbi_image_free(labels);
 }
 
 Graph::~Graph()
 {
     stbi_image_free(this->_img);
+    stbi_image_free(this->_labels);
 }
 
 void Graph::normalize_histo(size_t **bck_histo, size_t **obj_histo, float **norm_bck_histo,
@@ -167,6 +168,10 @@ void Graph::initialize_node_capacities(int x, int y) {
         auto idx_nghb = (y + this->y_nghb[i]) * _width + (x + this->x_nghb[i]);
         if (y + y_nghb[i] >= 0 && y + y_nghb[i] < _height &&
             x + x_nghb[i] >= 0 && x + x_nghb[i] < _width) {
+            if (_labels[idx_nghb*3])
+                this->_neighbors[i][idx_curr] = 0;
+            if (_labels[idx_nghb*3+2])
+                this->_neighbors[i][idx_curr] = 255;
             // auto norm =std::abs(this->_img[idx_curr*3] - this->_img[idx_nghb*3]) +
             //            std::abs(this->_img[idx_curr*3+1] - this->_img[idx_nghb*3+1]) +
             //            std::abs(this->_img[idx_curr*3+2] - this->_img[idx_nghb*3+2]);
@@ -180,7 +185,7 @@ float Graph::gradient(int id, int mean[]) {
     auto norm = std::abs(this->_img[id] - mean[0]) +
                 std::abs(this->_img[id+1] - mean[1]) +
                 std::abs(this->_img[id+2] - mean[2]);
-    auto grad = 255.f / (norm/3 + 1) + 1;
+    auto grad = 255.f / (norm/3 + 1) + 1 * 10;
     return grad;
 }
 
@@ -188,22 +193,10 @@ float Graph::gradient(int id1, int id2) {
     auto norm = std::abs(this->_img[id1]   - this->_img[id2])   +
                 std::abs(this->_img[id1+1] - this->_img[id2+1]) +
                 std::abs(this->_img[id1+2] - this->_img[id2+2]);
-    auto grad = 255.f / (norm/3 + 1) + 1;
+    auto grad = 255.f / (norm/3 + 1) + 1 * 10;
     return grad;
 }
 
-float Graph::max_capacity(int x, int y) {
-    auto idx_curr = y * this->_width + x;
-    float max = FLT_MIN;
-    for (auto i = 0; i < 4; i++) {
-        auto idx_nghb = (y + this->y_nghb[i]) * _width + (x + this->x_nghb[i]);
-        if (y + y_nghb[i] >= 0 && y + y_nghb[i] < _height &&
-            x + x_nghb[i] >= 0 && x + x_nghb[i] < _width) {
-            max = std::max(max, this->_neighbors[i][idx_curr]);
-        }
-    }
-    return max;
-}
 
 void Graph::max_flow()
 {
@@ -212,13 +205,6 @@ void Graph::max_flow()
         for (auto y = 0; y < this->_height; y++)
             for (auto x = 0; x < this->_width; x++)
                 relabel(x, y, tmp_heights);
-        // std::cout << "HEIGHTS\n";
-        // for (auto y = 0; y < this->_height; y++) {
-        //     for (auto x = 0; x < this->_width; x++) {
-        //         std::cout << this->_heights[y*_width+x] << " ";
-        //     }
-        //     std::cout << "\n";
-        // }
         this->_heights = std::vector<int>(tmp_heights);
         for (auto y = 0; y < this->_height; y++)
             for (auto x = 0; x < this->_width; x++)
@@ -254,7 +240,7 @@ void Graph::push(int x, int y) {
         if (this->_heights[idx_nghb] != this->_heights[idx_curr] - 1)
             continue;
         // Pushed flow
-        float flow = std::min(this->_neighbors[i][idx_curr], this->_excess_flow[idx_curr]);
+        int flow = std::min(this->_neighbors[i][idx_curr], this->_excess_flow[idx_curr]);
         // Update excess flow
         this->_excess_flow[idx_curr] -= flow;
         this->_excess_flow[idx_nghb] += flow;
@@ -321,7 +307,7 @@ void Graph::print() {
         {
             auto n_idx = y * this->_width * 3 + x * 3;
             auto flow = this->_excess_flow[y*_width +x];
-            if (_binary[y*_width+x] > 0)
+            if (_binary[y*_width+x])
                 file << int(_img[n_idx]) << " " << int(_img[n_idx+1]) << " "<< int(_img[n_idx+2]) << " ";
             else
                 file << "0 0 0 ";

@@ -35,18 +35,19 @@ private:
     int _size;
     unsigned int _nb_active;
     unsigned char *_img;
+    unsigned char *_labels;
 
     std::queue<int> _dfs;
     std::vector<bool> _binary;
 
     std::vector<int> _heights;
-    std::vector<float> _excess_flow;
-    std::vector<float> _up;
-    std::vector<float> _right;
-    std::vector<float> _bottom;
-    std::vector<float> _left;
+    std::vector<int> _excess_flow;
+    std::vector<int> _up;
+    std::vector<int> _right;
+    std::vector<int> _bottom;
+    std::vector<int> _left;
 
-    std::vector<float> _neighbors[4];    // {up, right, bottom, left}
+    std::vector<int> _neighbors[4];    // {up, right, bottom, left}
     const int x_nghb[4] = {0, 1, 0, -1}; // idx offset for x axis
     const int y_nghb[4] = {-1, 0, 1, 0}; // idx offset for y axis
     const int id_opp[4] = {2, 3, 0, 1};  // idx of opposite array up=0, right=1, bottom=2, left=3
