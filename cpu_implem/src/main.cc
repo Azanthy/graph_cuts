@@ -10,5 +10,6 @@ int main(int argc, char *argv[])
     }
     auto graph = Graph(argv[1], argv[2]);
     graph.max_flow();
+    graph.dfs();
     graph.print();
 }

@@ -5,6 +5,8 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
+#include <cfloat>
+#include <queue>
 
 #include "graph.hh"
 
@@ -12,9 +14,9 @@
 #include "stb_image.h"
 
 #define HISTO_FACTOR 4
-#define HEIGHT_MAX 50
+#define HEIGHT_MAX 100
 #define MANHATTAN(data, i, j)   std::abs(data[i]-data[j]) + std::abs(data[i+1]-data[j+1]) + std::abs(data[i+2]-data[j+2])
-#define DISTANCE(data, i, j)    std::exp(-MANHATTAN(data, i, j)/255.f) //TODO grayscale -> rgb
+#define DISTANCE(data, i, j)    std::exp(-MANHATTAN(data, i, j)/255.f)
 #define BIN_VAL(hist, data, i)  (hist[0][data[i]/4] + hist[1][data[i+1]/4] + hist[2][data[i+2]/4]) / 3.f
 
 Graph::Graph(char *img, char *seeds) {
@@ -36,29 +38,57 @@ Graph::Graph(char *img, char *seeds) {
 
     this->_img = data;
     this->_size = this->_width * this->_height;
+    this->_binary = std::vector<bool>(this->_size, false);
     this->_heights = std::vector<int>(this->_size, 0);
-    this->_excess_flow = std::vector<float>(this->_size,0.f);
+    this->_excess_flow = std::vector<float>(this->_size, 0);
     for (auto i=0; i < 4; i++)
-        this->_neighbors[i] = std::vector<float>(this->_size,0.f);
+        this->_neighbors[i] = std::vector<float>(this->_size, 0);
+    this->_dfs = std::queue<int>();
 
+    int total_obj = 0;
+    int total_bck = 0;
+    int mean_obj[3] = {0, 0, 0};
+    int mean_bck[3] = {0, 0, 0};
     // Initialize nodes and histograms
     for (auto y = 0; y < this->_height; y++) {
         for (auto x = 0; x < this->_width; x++) {
             auto idx = y * this->_width + x;
             auto n_idx = y * this->_width * n + x * n;
-            for (auto i = 0; i < 3; i++) {
-                // Histograms of size 256/4=64
-                if (labels[n_idx] > 220) { // Red color for background
-                    bck_histo[i][data[n_idx+i]/HISTO_FACTOR] += 1;
-                    this->_excess_flow[idx] = -1.f;
-                }
-                if (labels[n_idx+2] > 220) { // Blue color for object
-                    obj_histo[i][data[n_idx+i]/HISTO_FACTOR] += 1;
-                    this->_excess_flow[idx] = 1.f;
-                    this->_heights[idx] = HEIGHT_MAX;
-                }
+            // for (auto i = 0; i < 3; i++) {
+            //     // Histograms of size 256/4=64
+            //     if (labels[n_idx] > 220) { // Red color for background
+            //         bck_histo[i][data[n_idx+i]/HISTO_FACTOR] += 1;
+            //         total_bck++;
+            //         mean_bck[i] += data[n_idx+i];
+            //     }
+            //     if (labels[n_idx+2] > 220) { // Blue color for object
+            //         obj_histo[i][data[n_idx+i]/HISTO_FACTOR] += 1;
+            //         total_obj++;
+            //         mean_obj[i] += data[n_idx+i];
+            //         this->_dfs.push(idx);
+            //         this->_binary[idx] = true;
+            //     }
+            // }
+            if (labels[n_idx] > 220) { // Red color for background
+                total_bck++;
+                mean_bck[0] += data[n_idx];
+                mean_bck[1] += data[n_idx+1];
+                mean_bck[2] += data[n_idx+2];
+
+            }
+            if (labels[n_idx+2] > 220) { // Blue color for object
+                total_obj++;
+                mean_obj[0] += data[n_idx];
+                mean_obj[1] += data[n_idx+1];
+                mean_obj[2] += data[n_idx+2];
+                this->_dfs.push(idx);
+                this->_binary[idx] = true;
             }
         }
+    }
+    for (auto i=0; i<3; i++) {
+        mean_bck[i] /= total_bck;
+        mean_obj[i] /= total_obj;
     }
 
     // Compute histograms for external capacities
@@ -72,18 +102,23 @@ Graph::Graph(char *img, char *seeds) {
             auto idx = y * this->_width + x;
             auto n_idx = y * this->_width * n + x * n;
 
-            // Initialize external capacities if not on seeds
-            // if (this->_excess_flow[idx] == 0.f) {
-                float weight_snk = 1.f - std::exp(-BIN_VAL(norm_bck_histo, data, n_idx));
-                float weight_src = 1.f - std::exp(-BIN_VAL(norm_obj_histo, data, n_idx));
-                this->_excess_flow[idx] = weight_src - weight_snk;
-            // }
-
             // Initialize neighbors capacities
             initialize_node_capacities(x, y);
+
+            float weight_src = gradient(n_idx, mean_obj);
+            float weight_snk = gradient(n_idx, mean_bck);
+
+            this->_excess_flow[idx] = weight_src - weight_snk;
         }
     }
 
+    // std::cout << "HEIGHTS\n";
+    // for (auto y = 0; y < this->_height; y++) {
+    //     for (auto x = 0; x < this->_width; x++) {
+    //         std::cout << this->_excess_flow[y*_width+x] << " ";
+    //     }
+    //     std::cout << "\n";
+    // }
     for (auto i=0; i<3;i++){
         delete[] bck_histo[i];
         delete[] obj_histo[i];
@@ -132,12 +167,42 @@ void Graph::initialize_node_capacities(int x, int y) {
         auto idx_nghb = (y + this->y_nghb[i]) * _width + (x + this->x_nghb[i]);
         if (y + y_nghb[i] >= 0 && y + y_nghb[i] < _height &&
             x + x_nghb[i] >= 0 && x + x_nghb[i] < _width) {
-            auto norm =std::abs(this->_img[idx_curr] - this->_img[idx_nghb]) +
-                       std::abs(this->_img[idx_curr+1] - this->_img[idx_nghb+1]) +
-                       std::abs(this->_img[idx_curr+2] - this->_img[idx_nghb+2]);
-            this->_neighbors[i][idx_curr] = std::exp(-norm / 384);
+            // auto norm =std::abs(this->_img[idx_curr*3] - this->_img[idx_nghb*3]) +
+            //            std::abs(this->_img[idx_curr*3+1] - this->_img[idx_nghb*3+1]) +
+            //            std::abs(this->_img[idx_curr*3+2] - this->_img[idx_nghb*3+2]);
+            // this->_neighbors[i][idx_curr] = -std::log(std::exp(-norm / 384.f));
+            this->_neighbors[i][idx_curr] = gradient(idx_curr*3, idx_nghb*3);
         }
     }
+}
+
+float Graph::gradient(int id, int mean[]) {
+    auto norm = std::abs(this->_img[id] - mean[0]) +
+                std::abs(this->_img[id+1] - mean[1]) +
+                std::abs(this->_img[id+2] - mean[2]);
+    auto grad = 255.f / (norm/3 + 1) + 1;
+    return grad;
+}
+
+float Graph::gradient(int id1, int id2) {
+    auto norm = std::abs(this->_img[id1]   - this->_img[id2])   +
+                std::abs(this->_img[id1+1] - this->_img[id2+1]) +
+                std::abs(this->_img[id1+2] - this->_img[id2+2]);
+    auto grad = 255.f / (norm/3 + 1) + 1;
+    return grad;
+}
+
+float Graph::max_capacity(int x, int y) {
+    auto idx_curr = y * this->_width + x;
+    float max = FLT_MIN;
+    for (auto i = 0; i < 4; i++) {
+        auto idx_nghb = (y + this->y_nghb[i]) * _width + (x + this->x_nghb[i]);
+        if (y + y_nghb[i] >= 0 && y + y_nghb[i] < _height &&
+            x + x_nghb[i] >= 0 && x + x_nghb[i] < _width) {
+            max = std::max(max, this->_neighbors[i][idx_curr]);
+        }
+    }
+    return max;
 }
 
 void Graph::max_flow()
@@ -147,6 +212,13 @@ void Graph::max_flow()
         for (auto y = 0; y < this->_height; y++)
             for (auto x = 0; x < this->_width; x++)
                 relabel(x, y, tmp_heights);
+        // std::cout << "HEIGHTS\n";
+        // for (auto y = 0; y < this->_height; y++) {
+        //     for (auto x = 0; x < this->_width; x++) {
+        //         std::cout << this->_heights[y*_width+x] << " ";
+        //     }
+        //     std::cout << "\n";
+        // }
         this->_heights = std::vector<int>(tmp_heights);
         for (auto y = 0; y < this->_height; y++)
             for (auto x = 0; x < this->_width; x++)
@@ -208,7 +280,7 @@ void Graph::relabel(int x, int y, std::vector<int> &heights) {
 
 bool Graph::is_active(int x, int y) {
     auto idx = y * this->_width + x;
-    return this->_excess_flow[idx] > 0.f && this->_heights[idx] < HEIGHT_MAX;
+    return this->_excess_flow[idx] > 0 && this->_heights[idx] < HEIGHT_MAX;
 }
 
 bool Graph::any_active() {
@@ -217,6 +289,25 @@ bool Graph::any_active() {
         if (is_active(x, y))
             return true;
     return false;
+}
+
+void Graph::dfs() {
+    while (!_dfs.empty()) {
+        int idx = _dfs.front();
+        _dfs.pop();
+        int x = idx % _width;
+        int y = idx / _width;
+        for (auto i = 0; i < 4; i++) {
+            auto idx_nghb = (y + this->y_nghb[i]) * _width + (x + this->x_nghb[i]);
+            if (y + y_nghb[i] < 0 || y + y_nghb[i] >= _height ||
+                x + x_nghb[i] < 0 || x + x_nghb[i] >= _width)
+                continue;
+            if (this->_neighbors[i][idx] > 0.f && !_binary[idx_nghb]) {
+                _binary[idx_nghb] = true;
+                _dfs.push(idx_nghb);
+            }
+        }
+    }
 }
 
 void Graph::print() {
@@ -230,7 +321,7 @@ void Graph::print() {
         {
             auto n_idx = y * this->_width * 3 + x * 3;
             auto flow = this->_excess_flow[y*_width +x];
-            if (_excess_flow[y*_width+x] > 0.f)
+            if (_binary[y*_width+x] > 0)
                 file << int(_img[n_idx]) << " " << int(_img[n_idx+1]) << " "<< int(_img[n_idx+2]) << " ";
             else
                 file << "0 0 0 ";

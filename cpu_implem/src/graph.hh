@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <queue>
 
 class Graph {
 public:
@@ -18,9 +19,13 @@ public:
     void relabel(int x, int y, std::vector<int> &heights);
     bool is_active(int x, int y);
     bool any_active();
+    void dfs();
     void print();
 
 private:
+    float max_capacity(int x, int y);
+    float gradient(int id1, int id2);
+    float gradient(int id, int mean[]);
     void normalize_histo(size_t **bck_histo, size_t **obj_histo, float **norm_bck_histo, float **norm_obj_histo);
     void initialize_node_capacities(int x, int y);
 
@@ -30,6 +35,9 @@ private:
     int _size;
     unsigned int _nb_active;
     unsigned char *_img;
+
+    std::queue<int> _dfs;
+    std::vector<bool> _binary;
 
     std::vector<int> _heights;
     std::vector<float> _excess_flow;
