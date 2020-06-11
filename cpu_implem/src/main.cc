@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "graph.hh"
+#include "gpu.hh"
 
 int main(int argc, char *argv[])
 {
@@ -9,7 +10,8 @@ int main(int argc, char *argv[])
         exit(-1);
     }
     auto graph = Graph(argv[1], argv[2]);
-    graph.max_flow();
-    graph.dfs();
-    graph.print();
+    max_flow_gpu(graph);
+    //graph.max_flow();
+    //graph.dfs();
+    //graph.print();
 }
