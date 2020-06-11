@@ -14,7 +14,7 @@
 #include "stb_image.h"
 
 #define HISTO_FACTOR 4
-#define HEIGHT_MAX 100
+#define HEIGHT_MAX 400
 #define MANHATTAN(data, i, j)   std::abs(data[i]-data[j]) + std::abs(data[i+1]-data[j+1]) + std::abs(data[i+2]-data[j+2])
 #define DISTANCE(data, i, j)    std::exp(-MANHATTAN(data, i, j)/255.f)
 #define BIN_VAL(hist, data, i)  (hist[0][data[i]/4] + hist[1][data[i+1]/4] + hist[2][data[i+2]/4]) / 3.f
@@ -72,16 +72,17 @@ Graph::Graph(char *img, char *seeds) {
             // }
             if (labels[n_idx] > 220) { // Red color for background
                 total_bck++;
-                mean_bck[0] += data[n_idx];
-                mean_bck[1] += data[n_idx+1];
-                mean_bck[2] += data[n_idx+2];
-
+                for (auto i = 0; i < 3; i++) {
+                    mean_bck[i] += data[n_idx+i];
+                    bck_histo[i][data[n_idx+i]/HISTO_FACTOR] += 1;
+                }
             }
             if (labels[n_idx+2] > 220) { // Blue color for object
                 total_obj++;
-                mean_obj[0] += data[n_idx];
-                mean_obj[1] += data[n_idx+1];
-                mean_obj[2] += data[n_idx+2];
+                for (auto i = 0; i < 3; i++) {
+                    mean_obj[i] += data[n_idx+i];
+                    obj_histo[i][data[n_idx+i]/HISTO_FACTOR] += 1;
+                }
                 this->_dfs.push(idx);
                 this->_binary[idx] = true;
             }
@@ -106,6 +107,8 @@ Graph::Graph(char *img, char *seeds) {
             // Initialize neighbors capacities
             initialize_node_capacities(x, y);
 
+            // float weight_src = 255 * BIN_VAL(norm_obj_histo, data, n_idx);
+            // float weight_snk = 255 * BIN_VAL(norm_bck_histo, data, n_idx);
             float weight_src = gradient(n_idx, mean_obj);
             float weight_snk = gradient(n_idx, mean_bck);
 
@@ -193,7 +196,7 @@ float Graph::gradient(int id1, int id2) {
     auto norm = std::abs(this->_img[id1]   - this->_img[id2])   +
                 std::abs(this->_img[id1+1] - this->_img[id2+1]) +
                 std::abs(this->_img[id1+2] - this->_img[id2+2]);
-    auto grad = 255.f / (norm/3 + 1) + 1 * 10;
+    auto grad = 255.f / (norm/3 + 1) + 1;
     return grad;
 }
 
