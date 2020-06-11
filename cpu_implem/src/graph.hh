@@ -16,7 +16,7 @@ public:
     ~Graph();
     void max_flow();
     void push(int x, int y);
-    void relabel(int x, int y, std::vector<int> &heights);
+    void relabel(int x, int y, int *heights);
     bool is_active(int x, int y);
     bool any_active();
     void dfs();
@@ -39,14 +39,14 @@ public:
     std::queue<int> _dfs;
     std::vector<bool> _binary;
 
-    std::vector<int> _heights;
-    std::vector<int> _excess_flow;
-    std::vector<int> _up;
-    std::vector<int> _right;
-    std::vector<int> _bottom;
-    std::vector<int> _left;
+    int *_heights;
+    int *_excess_flow;
+    int *_up;
+    int *_right;
+    int *_bottom;
+    int *_left;
 
-    std::vector<int> _neighbors[4];    // {up, right, bottom, left}
+    int *_neighbors[4];    // {up, right, bottom, left}
     const int x_nghb[4] = {0, 1, 0, -1}; // idx offset for x axis
     const int y_nghb[4] = {-1, 0, 1, 0}; // idx offset for y axis
     const int id_opp[4] = {2, 3, 0, 1};  // idx of opposite array up=0, right=1, bottom=2, left=3

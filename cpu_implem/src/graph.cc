@@ -14,7 +14,7 @@
 #include "stb_image.h"
 
 #define HISTO_FACTOR 4
-#define HEIGHT_MAX 400
+#define HEIGHT_MAX 100
 #define MANHATTAN(data, i, j)   std::abs(data[i]-data[j]) + std::abs(data[i+1]-data[j+1]) + std::abs(data[i+2]-data[j+2])
 #define DISTANCE(data, i, j)    std::exp(-MANHATTAN(data, i, j)/255.f)
 #define BIN_VAL(hist, data, i)  (hist[0][data[i]/4] + hist[1][data[i+1]/4] + hist[2][data[i+2]/4]) / 3.f
@@ -40,10 +40,10 @@ Graph::Graph(char *img, char *seeds) {
     this->_labels = labels;
     this->_size = this->_width * this->_height;
     this->_binary = std::vector<bool>(this->_size, false);
-    this->_heights = std::vector<int>(this->_size, 0);
-    this->_excess_flow = std::vector<int>(this->_size, 0);
+    this->_heights = new int[this->_size]();
+    this->_excess_flow = new int[this->_size]();
     for (auto i=0; i < 4; i++)
-        this->_neighbors[i] = std::vector<int>(this->_size, 0);
+        this->_neighbors[i] = new int[this->_size]();
     this->_dfs = std::queue<int>();
 
     int total_obj = 0;
@@ -204,11 +204,13 @@ float Graph::gradient(int id1, int id2) {
 void Graph::max_flow()
 {
     while (any_active()) {
-        auto tmp_heights = std::vector<int>(this->_heights);
+        int *tmp_heights = new int[this->_size]();
+        memcpy(tmp_heights, _heights, _size * sizeof(int));
         for (auto y = 0; y < this->_height; y++)
             for (auto x = 0; x < this->_width; x++)
                 relabel(x, y, tmp_heights);
-        this->_heights = std::vector<int>(tmp_heights);
+        memcpy(_heights, tmp_heights, _size * sizeof(int));
+        delete[] tmp_heights;
         for (auto y = 0; y < this->_height; y++)
             for (auto x = 0; x < this->_width; x++)
                 push(x, y);
@@ -254,7 +256,7 @@ void Graph::push(int x, int y) {
 }
 
 // Code is correct
-void Graph::relabel(int x, int y, std::vector<int> &heights) {
+void Graph::relabel(int x, int y, int *heights) {
     if (!is_active(x, y))
         return;
     auto idx_curr = y * this->_width + x;
