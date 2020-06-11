@@ -22,7 +22,6 @@ public:
     void dfs();
     void print();
 
-private:
     float max_capacity(int x, int y);
     float gradient(int id1, int id2);
     float gradient(int id, int mean[]);
