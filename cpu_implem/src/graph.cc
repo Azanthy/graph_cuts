@@ -137,8 +137,8 @@ Graph::Graph(char *img, char *seeds) {
 
 Graph::~Graph()
 {
-    stbi_image_free(this->_img);
-    stbi_image_free(this->_labels);
+    //stbi_image_free(this->_img);
+    //stbi_image_free(this->_labels);
 }
 
 void Graph::normalize_histo(size_t **bck_histo, size_t **obj_histo, float **norm_bck_histo,

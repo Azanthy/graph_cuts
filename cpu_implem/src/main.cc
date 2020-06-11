@@ -13,5 +13,5 @@ int main(int argc, char *argv[])
     max_flow_gpu(graph);
     //graph.max_flow();
     //graph.dfs();
-    //graph.print();
+    graph.print();
 }

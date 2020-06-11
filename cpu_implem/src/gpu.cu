@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "gpu.hh"
 
 #define HEIGHT_MAX 50
@@ -8,6 +10,10 @@
             exit(EXIT_FAILURE);                                                           \
         }                                                                                 \
     }                                                                                     \
+
+__device__ inline int* at(int *addr, int x, int y, int pitch) {
+    return (int*)(char*)addr + pitch * y + x * sizeof(int)
+}
 
 __global__ void relabel(int *excess, int *neighbors[4], int *heights, int width,
         int height)
@@ -67,6 +73,16 @@ __global__ void push(int *excess, int *neighbors[4], int *heights, int width,
     }
 }
 
+__global__ void print_value(int *array, int pitch, int width, int height)
+{
+    int x = blockDim.x * blockIdx.x + threadIdx.x;
+    int y = blockDim.y * blockIdx.y + threadIdx.y;
+
+    if (x >= width || y >= height)
+        return;
+    
+}
+
 void max_flow_gpu(Graph graph)
 {
     cudaError_t rc = cudaSuccess;
@@ -85,9 +101,11 @@ void max_flow_gpu(Graph graph)
     int *excess;
     cudaMallocPitch(&excess, &pitch, width * sizeof(int), height);
     cudaCheckError();
-    cudaMemcpy2D(excess, width * sizeof(int),
-                 graph._excess_flow.data(), pitch, width * sizeof(int), height,
-                 cudaMemcpyHostToDevice);
+    cudaMemcpy2D(excess, pitch,
+                 graph._excess_flow.data(), width * sizeof(int)
+                 width * sizeof(int), height, cudaMemcpyHostToDevice);
+    cudaCheckError();
+    cudaFree(excess);
     /*int *heights;
     int *tmp_heights;
     int *up;
