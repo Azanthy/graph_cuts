@@ -12,7 +12,7 @@
     }                                                                                     \
 
 __device__ inline int* at(int *addr, int x, int y, int pitch) {
-    return (int*)(char*)addr + pitch * y + x * sizeof(int)
+    return (int*)(char*)addr + pitch * y + x * sizeof(int);
 }
 
 __global__ void relabel(int *excess, int *neighbors[4], int *heights, int width,
@@ -83,9 +83,23 @@ __global__ void print_value(int *array, int pitch, int width, int height)
     
 }
 
+
+int *duplicate_on_gpu(int *vect, int width, int height, size_t pitch)
+{
+    int *array;
+
+    cudaMallocPitch(&array, &pitch, width * sizeof(int), height);
+    cudaCheckError();
+    std::cout << "Pitch: "<<pitch<<std::endl;
+    cudaMemcpy2D(array, pitch,
+                 vect, width * sizeof(int),
+                 width * sizeof(int), height, cudaMemcpyHostToDevice);
+    cudaCheckError();
+    return array;
+}
+
 void max_flow_gpu(Graph graph)
 {
-    cudaError_t rc = cudaSuccess;
     // Setting dimension
     int width  = graph._width;
     int height = graph._height;
@@ -98,22 +112,16 @@ void max_flow_gpu(Graph graph)
 
     // Allocate for gpu
     size_t pitch;
-    int *excess;
-    cudaMallocPitch(&excess, &pitch, width * sizeof(int), height);
-    cudaCheckError();
-    cudaMemcpy2D(excess, pitch,
-                 graph._excess_flow.data(), width * sizeof(int)
-                 width * sizeof(int), height, cudaMemcpyHostToDevice);
-    cudaCheckError();
-    cudaFree(excess);
-    /*int *heights;
+    int *excess = duplicate_on_gpu(graph._excess_flow, width, height, pitch);
+    int *heights = duplicate_on_gpu(graph._heights, width, height, pitch);
     int *tmp_heights;
-    int *up;
-    int *right;
-    int *bottom;
-    int *left;
+    int *up = duplicate_on_gpu(graph._neighbors[0], width, height, pitch);
+    int *right = duplicate_on_gpu(graph._neighbors[1], width, height, pitch);
+    int *bottom = duplicate_on_gpu(graph._neighbors[2], width, height, pitch);
+    int *left = duplicate_on_gpu(graph._neighbors[3], width, height, pitch);
 
-    while ()
+
+   /* while ()
     {
         relabel<<<dimGrid, dimBlock>>>();
         push<<<dimGrid, dimBlock>>>();
