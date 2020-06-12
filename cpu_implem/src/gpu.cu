@@ -28,13 +28,12 @@ __global__ void relabel(int *excess, int *heights, int *tmp_heights, int *up,
     if (x >= width || y >= height)
         return;
 
-    int idx = y * width + x;
     if (*at(excess, x, y, pitch) <= 0 || *at(heights, x, y, pitch) >= HEIGHT_MAX)
         return;
-    int *ptr = at(tmp_heights, x, y, pitch);
 
     int *neighbors[4] = {up, right, bottom, left};
     int tmp_height = HEIGHT_MAX;
+
     for (int i = 0; i < 4; i++)
     {
         int new_x = x + x_nghb[i];
@@ -43,49 +42,40 @@ __global__ void relabel(int *excess, int *heights, int *tmp_heights, int *up,
             tmp_height = min(tmp_height, *at(heights, new_x, new_y, pitch) + 1);
     }
     *at(tmp_heights, x, y, pitch) = tmp_height;
-
 }
 
 __global__ void push(int *excess, int *heights, int *up, int *right,
-        int *bottom, int *left, int width, int height)
+        int *bottom, int *left, int width, int height, int pitch)
 {
     int x = blockDim.x * blockIdx.x + threadIdx.x;
     int y = blockDim.y * blockIdx.y + threadIdx.y;
 
     if (x >= width || y >= height)
         return;
-    printf("x:%d|y:%d", x,y);
-    int idx = y * width + x;
-    if (excess[idx] <= 0 || heights[idx] >= HEIGHT_MAX)
+
+    if (*at(excess, x, y, pitch) <= 0 || *at(heights, x, y, pitch) >= HEIGHT_MAX)
         return;
 
     int *neighbors[4] = {up, right, bottom, left};
 
     for (auto i = 0; i < 4; i++) {
-        auto idx_nghb = (y + y_nghb[i]) * width + (x + x_nghb[i]);
-        if (y + y_nghb[i] < 0 || y + y_nghb[i] >= height ||
-            x + x_nghb[i] < 0 || x + x_nghb[i] >= width)
+        int new_x = x + x_nghb[i];
+        int new_y = y + y_nghb[i];
+
+        if (new_y < 0 || new_y >= height || new_x < 0 || new_x >= width)
             continue;
-        if (heights[idx_nghb] != heights[idx] - 1)
-            return;
-        int flow = neighbors[i][idx] > excess[idx] ? excess[idx] : neighbors[i][idx];
-        // make atomic here
-        excess[idx] -= flow;
-        excess[idx_nghb] += flow;
 
-        neighbors[i][idx] -= flow;
-        neighbors[id_opp[i]][idx_nghb] += flow;
+        if (*at(heights, new_x, new_y, pitch) != *at(heights, x, y, pitch) - 1)
+            continue;
+
+        int flow = min(*at(neighbors[i], x, y, pitch), *at(excess, x, y, pitch));
+
+        atomicAdd(at(excess, x, y, pitch),        -flow);
+        atomicAdd(at(excess, new_x, new_y, pitch), flow);
+
+        atomicAdd(at(neighbors[i], x, y, pitch),                -flow);
+        atomicAdd(at(neighbors[id_opp[i]], new_x, new_y, pitch), flow);
     }
-}
-
-__global__ void print_value(int *array, int pitch, int width, int height)
-{
-    int x = blockDim.x * blockIdx.x + threadIdx.x;
-    int y = blockDim.y * blockIdx.y + threadIdx.y;
-
-    if (x >= width || y >= height)
-        return;
-    
 }
 
 
@@ -113,7 +103,7 @@ void max_flow_gpu(Graph graph)
     dim3 dimBlock(32, 32);
     dim3 dimGrid(w, h);
 
-    auto arr = graph._heights;
+    auto arr = graph._excess_flow;
     std::cout << std::endl<<arr[0] << " " << arr[1] <<" "<<arr[2]<<std::endl
         << arr[3] << " " << arr[4] <<" "<<arr[5]<<std::endl
         << arr[6] << " " << arr[7] <<" "<<arr[8]<<std::endl;
@@ -130,12 +120,16 @@ void max_flow_gpu(Graph graph)
 
     relabel<<<dimGrid, dimBlock>>>(excess, heights, tmp_heights, up, right, bottom, left,
             width, height, pitch);
+    cudaMemcpy2D(heights, pitch, tmp_heights, pitch, 
+                 width * sizeof(int), height, cudaMemcpyDeviceToDevice);
+    push<<<dimGrid, dimBlock>>>(excess, tmp_heights, up, right, bottom, left,
+            width, height, pitch);
 
     // try if memory was well duplicated
-    std::cout << pitch << std::endl;
+    std::cout << std::endl;
     int *new_arr = new int[9]();
     cudaMemcpy2D(new_arr, width * sizeof(int),
-                 tmp_heights, pitch,
+                 excess, pitch,
                  width * sizeof(int), height, cudaMemcpyDeviceToHost);
     arr = new_arr;
     std::cout << arr[0] << " " << arr[1] <<" "<<arr[2]<<std::endl
