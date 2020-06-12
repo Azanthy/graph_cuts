@@ -12,6 +12,6 @@ int main(int argc, char *argv[])
     auto graph = Graph(argv[1], argv[2]);
     max_flow_gpu(graph);
     //graph.max_flow();
-    //graph.dfs();
+    graph.dfs();
     graph.print();
 }

@@ -2,7 +2,7 @@
 
 #include "gpu.hh"
 
-#define HEIGHT_MAX 50
+#define HEIGHT_MAX 100
 #define cudaCheckError() {                                                                \
         cudaError_t e=cudaGetLastError();                                                 \
         if(e!=cudaSuccess) {                                                              \
@@ -38,7 +38,7 @@ __global__ void relabel(int *excess, int *heights, int *tmp_heights, int *up,
     {
         int new_x = x + x_nghb[i];
         int new_y = y + y_nghb[i];
-        if (*at(neighbors[i], new_x, new_y, pitch) > 0)
+        if (*at(neighbors[i], x, y, pitch) > 0)
             tmp_height = min(tmp_height, *at(heights, new_x, new_y, pitch) + 1);
     }
     *at(tmp_heights, x, y, pitch) = tmp_height;
@@ -103,10 +103,10 @@ void max_flow_gpu(Graph graph)
     dim3 dimBlock(32, 32);
     dim3 dimGrid(w, h);
 
-    auto arr = graph._excess_flow;
-    std::cout << std::endl<<arr[0] << " " << arr[1] <<" "<<arr[2]<<std::endl
+    //auto arr = graph._excess_flow;
+    /*std::cout << std::endl<<arr[0] << " " << arr[1] <<" "<<arr[2]<<std::endl
         << arr[3] << " " << arr[4] <<" "<<arr[5]<<std::endl
-        << arr[6] << " " << arr[7] <<" "<<arr[8]<<std::endl;
+        << arr[6] << " " << arr[7] <<" "<<arr[8]<<std::endl;*/
 
     // Allocate for gpu
     size_t pitch;
@@ -118,27 +118,41 @@ void max_flow_gpu(Graph graph)
     int *bottom = duplicate_on_gpu(graph._neighbors[2], width, height, pitch);
     int *left = duplicate_on_gpu(graph._neighbors[3], width, height, pitch);
 
-    relabel<<<dimGrid, dimBlock>>>(excess, heights, tmp_heights, up, right, bottom, left,
-            width, height, pitch);
-    cudaMemcpy2D(heights, pitch, tmp_heights, pitch, 
-                 width * sizeof(int), height, cudaMemcpyDeviceToDevice);
-    push<<<dimGrid, dimBlock>>>(excess, tmp_heights, up, right, bottom, left,
-            width, height, pitch);
 
-    // try if memory was well duplicated
-    std::cout << std::endl;
-    int *new_arr = new int[9]();
-    cudaMemcpy2D(new_arr, width * sizeof(int),
-                 excess, pitch,
-                 width * sizeof(int), height, cudaMemcpyDeviceToHost);
-    arr = new_arr;
-    std::cout << arr[0] << " " << arr[1] <<" "<<arr[2]<<std::endl
-        << arr[3] << " " << arr[4] <<" "<<arr[5]<<std::endl
-        << arr[6] << " " << arr[7] <<" "<<arr[8]<<std::endl;
-
-   /* while ()
+    while (graph.any_active())
     {
-        relabel<<<dimGrid, dimBlock>>>();
-        push<<<dimGrid, dimBlock>>>();
-    }*/
+        // Double buffering not smart here
+        cudaMemcpy2D(tmp_heights, pitch, heights, pitch, 
+                 width * sizeof(int), height, cudaMemcpyDeviceToDevice);
+        relabel<<<dimGrid, dimBlock>>>(excess, heights, tmp_heights, up, right, bottom, left,
+            width, height, pitch);
+        cudaMemcpy2D(heights, pitch, tmp_heights, pitch, 
+                 width * sizeof(int), height, cudaMemcpyDeviceToDevice);
+
+        // Push call
+        push<<<dimGrid, dimBlock>>>(excess, heights, up, right, bottom, left,
+            width, height, pitch);
+
+        // Set back to cpu memory for any_active check not smart
+        cudaMemcpy2D(graph._excess_flow, width * sizeof(int),
+                     excess, pitch,
+                     width * sizeof(int), height, cudaMemcpyDeviceToHost);
+        cudaMemcpy2D(graph._heights, width * sizeof(int),
+                     heights, pitch,
+                     width * sizeof(int), height, cudaMemcpyDeviceToHost);
+    }
+
+    // recopying data from gpu to cpu for min cut
+    cudaMemcpy2D(graph._neighbors[0], width * sizeof(int),
+                     up, pitch,
+                     width * sizeof(int), height, cudaMemcpyDeviceToHost);
+    cudaMemcpy2D(graph._neighbors[1], width * sizeof(int),
+                     right, pitch,
+                     width * sizeof(int), height, cudaMemcpyDeviceToHost);
+    cudaMemcpy2D(graph._neighbors[2], width * sizeof(int),
+                     bottom, pitch,
+                     width * sizeof(int), height, cudaMemcpyDeviceToHost);
+    cudaMemcpy2D(graph._neighbors[3], width * sizeof(int),
+                     left, pitch,
+                     width * sizeof(int), height, cudaMemcpyDeviceToHost);
 }
