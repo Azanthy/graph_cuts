@@ -2,7 +2,7 @@
 
 #include "gpu.hh"
 
-#define HEIGHT_MAX 100
+#define HEIGHT_MAX 1000
 #define cudaCheckError() {                                                                \
         cudaError_t e=cudaGetLastError();                                                 \
         if(e!=cudaSuccess) {                                                              \
@@ -20,7 +20,8 @@ __device__ inline int* at(int *addr, int x, int y, int pitch) {
 }
 
 __global__ void relabel(int *excess, int *heights, int *tmp_heights, int *up,
-        int *right, int *bottom, int *left, int width, int height, size_t pitch)
+        int *right, int *bottom, int *left, int width, int height, size_t pitch,
+        int height_max)
 {
     int x = blockDim.x * blockIdx.x + threadIdx.x;
     int y = blockDim.y * blockIdx.y + threadIdx.y;
@@ -28,11 +29,11 @@ __global__ void relabel(int *excess, int *heights, int *tmp_heights, int *up,
     if (x >= width || y >= height)
         return;
 
-    if (*at(excess, x, y, pitch) <= 0 || *at(heights, x, y, pitch) >= HEIGHT_MAX)
+    if (*at(excess, x, y, pitch) <= 0 || *at(heights, x, y, pitch) >= height_max)
         return;
 
     int *neighbors[4] = {up, right, bottom, left};
-    int tmp_height = HEIGHT_MAX;
+    int tmp_height = height_max;
 
     for (int i = 0; i < 4; i++)
     {
@@ -45,7 +46,7 @@ __global__ void relabel(int *excess, int *heights, int *tmp_heights, int *up,
 }
 
 __global__ void push(int *excess, int *heights, int *up, int *right,
-        int *bottom, int *left, int width, int height, int pitch)
+        int *bottom, int *left, int width, int height, int pitch, int height_max)
 {
     int x = blockDim.x * blockIdx.x + threadIdx.x;
     int y = blockDim.y * blockIdx.y + threadIdx.y;
@@ -53,7 +54,7 @@ __global__ void push(int *excess, int *heights, int *up, int *right,
     if (x >= width || y >= height)
         return;
 
-    if (*at(excess, x, y, pitch) <= 0 || *at(heights, x, y, pitch) >= HEIGHT_MAX)
+    if (*at(excess, x, y, pitch) <= 0 || *at(heights, x, y, pitch) >= height_max)
         return;
 
     int *neighbors[4] = {up, right, bottom, left};
@@ -97,6 +98,8 @@ void max_flow_gpu(Graph graph)
     // Setting dimension
     int width  = graph._width;
     int height = graph._height;
+    int size = graph._size;
+    //int size = 100;
     int w = std::ceil((float)width / 32);
     int h = std::ceil((float)height / 32);
 
@@ -118,20 +121,20 @@ void max_flow_gpu(Graph graph)
     int *bottom = duplicate_on_gpu(graph._neighbors[2], width, height, pitch);
     int *left = duplicate_on_gpu(graph._neighbors[3], width, height, pitch);
 
-
+    size_t iter = 0;
     while (graph.any_active())
     {
         // Double buffering not smart here
         cudaMemcpy2D(tmp_heights, pitch, heights, pitch, 
                  width * sizeof(int), height, cudaMemcpyDeviceToDevice);
         relabel<<<dimGrid, dimBlock>>>(excess, heights, tmp_heights, up, right, bottom, left,
-            width, height, pitch);
+            width, height, pitch, size);
         cudaMemcpy2D(heights, pitch, tmp_heights, pitch, 
                  width * sizeof(int), height, cudaMemcpyDeviceToDevice);
 
         // Push call
         push<<<dimGrid, dimBlock>>>(excess, heights, up, right, bottom, left,
-            width, height, pitch);
+            width, height, pitch, size);
 
         // Set back to cpu memory for any_active check not smart
         cudaMemcpy2D(graph._excess_flow, width * sizeof(int),
@@ -140,8 +143,10 @@ void max_flow_gpu(Graph graph)
         cudaMemcpy2D(graph._heights, width * sizeof(int),
                      heights, pitch,
                      width * sizeof(int), height, cudaMemcpyDeviceToHost);
+        iter++;
     }
-
+    
+    std::cout << "Nb iter: "<<iter<<std::endl;
     // recopying data from gpu to cpu for min cut
     cudaMemcpy2D(graph._neighbors[0], width * sizeof(int),
                      up, pitch,
