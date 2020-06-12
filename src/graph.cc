@@ -19,7 +19,7 @@
 #define DISTANCE(data, i, j)    std::exp(-MANHATTAN(data, i, j)/255.f)
 #define BIN_VAL(hist, data, i)  (hist[0][data[i]/4] + hist[1][data[i+1]/4] + hist[2][data[i+2]/4]) / 3.f
 
-Graph::Graph(char *img, char *seeds) {
+Graph::Graph(char *img, char *seeds, int height_max) {
     // Load image
     int n, tmp_w, tmp_h;
     unsigned char *data = stbi_load(img, &this->_width, &this->_height, &n, 0);
@@ -39,6 +39,7 @@ Graph::Graph(char *img, char *seeds) {
     this->_img = data;
     this->_labels = labels;
     this->_size = this->_width * this->_height;
+    this->_height_max = height_max;
     this->_binary = std::vector<bool>(this->_size, false);
     this->_heights = new int[this->_size]();
     this->_excess_flow = new int[this->_size]();
@@ -176,10 +177,6 @@ void Graph::initialize_node_capacities(int x, int y) {
                 this->_neighbors[i][idx_curr] = 0;
             if (_labels[idx_nghb*3+2] > 200)
                 this->_neighbors[i][idx_curr] = 255;
-            // auto norm =std::abs(this->_img[idx_curr*3] - this->_img[idx_nghb*3]) +
-            //            std::abs(this->_img[idx_curr*3+1] - this->_img[idx_nghb*3+1]) +
-            //            std::abs(this->_img[idx_curr*3+2] - this->_img[idx_nghb*3+2]);
-            // this->_neighbors[i][idx_curr] = -std::log(std::exp(-norm / 384.f));
         }
     }
 }
@@ -188,7 +185,7 @@ float Graph::gradient(int id, int mean[]) {
     auto norm = std::abs(this->_img[id] - mean[0]) +
                 std::abs(this->_img[id+1] - mean[1]) +
                 std::abs(this->_img[id+2] - mean[2]);
-    auto grad = 255.f / (norm/3 + 1) + 1 * 10;
+    auto grad = 255.f / (norm/3 + 1) + 1;
     return grad;
 }
 
@@ -214,24 +211,10 @@ void Graph::max_flow()
         for (auto y = 0; y < this->_height; y++)
             for (auto x = 0; x < this->_width; x++)
                 push(x, y);
-        auto nb_pos = 0;
-        auto nb_neg = 0;
-        for (auto y = 0; y < this->_height; y++) {
-            for (auto x = 0; x < this->_width; x++) {
-                if (is_active(x, y))
-                    nb_pos++;
-                else
-                    nb_neg++;
-            }
-        }
-        std::cout << "Active node: "<<nb_pos<<std::endl;
-        std::cout << "Non-Active node: "<<nb_neg<<std::endl;
-        std::cout << "Total node: "<<_size<<std::endl<<std::endl;
     }
-
 }
 
-//
+
 void Graph::push(int x, int y) {
     if (!is_active(x, y))
         return;
@@ -260,7 +243,7 @@ void Graph::relabel(int x, int y, int *heights) {
     if (!is_active(x, y))
         return;
     auto idx_curr = y * this->_width + x;
-    auto tmp_height = HEIGHT_MAX;
+    auto tmp_height = _height_max;
     for (auto i = 0; i < 4; i++) {
         auto idx_nghb = (y + this->y_nghb[i]) * _width + (x + this->x_nghb[i]);
         if (this->_neighbors[i][idx_curr] > 0.f)
@@ -271,7 +254,7 @@ void Graph::relabel(int x, int y, int *heights) {
 
 bool Graph::is_active(int x, int y) {
     auto idx = y * this->_width + x;
-    return this->_excess_flow[idx] > 0 && this->_heights[idx] < HEIGHT_MAX;
+    return this->_excess_flow[idx] > 0 && this->_heights[idx] < _height_max;
 }
 
 bool Graph::any_active() {

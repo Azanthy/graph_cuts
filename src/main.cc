@@ -9,7 +9,7 @@ int main(int argc, char *argv[])
         std::cerr << "graph_cuts: should be ./graph_cut <img> <seeds_img>" << std::endl;
         exit(-1);
     }
-    auto graph = Graph(argv[1], argv[2]);
+    auto graph = Graph(argv[1], argv[2], 1000);
     max_flow_gpu(graph);
     //graph.max_flow();
     graph.dfs();

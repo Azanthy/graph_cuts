@@ -98,7 +98,7 @@ void max_flow_gpu(Graph graph)
     // Setting dimension
     int width  = graph._width;
     int height = graph._height;
-    int size = graph._size;
+    int size = graph._height_max;
     //int size = 100;
     int w = std::ceil((float)width / 32);
     int h = std::ceil((float)height / 32);
@@ -106,10 +106,6 @@ void max_flow_gpu(Graph graph)
     dim3 dimBlock(32, 32);
     dim3 dimGrid(w, h);
 
-    //auto arr = graph._excess_flow;
-    /*std::cout << std::endl<<arr[0] << " " << arr[1] <<" "<<arr[2]<<std::endl
-        << arr[3] << " " << arr[4] <<" "<<arr[5]<<std::endl
-        << arr[6] << " " << arr[7] <<" "<<arr[8]<<std::endl;*/
 
     // Allocate for gpu
     size_t pitch;
@@ -121,7 +117,6 @@ void max_flow_gpu(Graph graph)
     int *bottom = duplicate_on_gpu(graph._neighbors[2], width, height, pitch);
     int *left = duplicate_on_gpu(graph._neighbors[3], width, height, pitch);
 
-    size_t iter = 0;
     while (graph.any_active())
     {
         // Double buffering not smart here
@@ -143,10 +138,8 @@ void max_flow_gpu(Graph graph)
         cudaMemcpy2D(graph._heights, width * sizeof(int),
                      heights, pitch,
                      width * sizeof(int), height, cudaMemcpyDeviceToHost);
-        iter++;
     }
     
-    std::cout << "Nb iter: "<<iter<<std::endl;
     // recopying data from gpu to cpu for min cut
     cudaMemcpy2D(graph._neighbors[0], width * sizeof(int),
                      up, pitch,

@@ -12,7 +12,7 @@
 
 class Graph {
 public:
-    Graph(char *img, char *seeds);
+    Graph(char *img, char *seeds, int height_max);
     ~Graph();
     void max_flow();
     void push(int x, int y);
@@ -32,6 +32,7 @@ public:
     int _width;
     int _height;
     int _size;
+    int _height_max;
     unsigned int _nb_active;
     unsigned char *_img;
     unsigned char *_labels;

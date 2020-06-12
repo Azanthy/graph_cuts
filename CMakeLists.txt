@@ -25,15 +25,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_BUILD_TYPE Debug)
 
 add_executable(graph_cuts
-        cpu_implem/src/main.cc
-        cpu_implem/src/node.cc
-        cpu_implem/src/graph.cc
-        cpu_implem/src/gpu.cu
+        src/main.cc
+        src/graph.cc
+        src/gpu.cu
         )
 
 add_executable(bench
-        cpu_implem/src/bench.cc
-        cpu_implem/src/graph.cc
-        cpu_implem/src/gpu.cu
+        src/bench.cc
+        src/graph.cc
+        src/gpu.cu
         )
 target_link_libraries(bench PRIVATE benchmark)
