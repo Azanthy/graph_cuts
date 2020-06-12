@@ -303,7 +303,7 @@ void Graph::dfs() {
 
 void Graph::print() {
     std::ofstream file;
-    file.open("output.pmm");
+    file.open("output.ppm");
 
     file << "P3\n" << this->_width << " "<< this->_height << "\n255\n";
     for (int y = 0; y < this->_height; y++)
