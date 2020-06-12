@@ -16,11 +16,11 @@ __constant__ int y_nghb[4] = {-1, 0, 1, 0}; // idx offset for y axis
 __constant__ int id_opp[4] = {2, 3, 0, 1};
 
 __device__ inline int* at(int *addr, int x, int y, int pitch) {
-    return (int*)(char*)addr + pitch * y + x * sizeof(int);
+    return (int*)((char*)addr + pitch * y + x * sizeof(int));
 }
 
-__global__ void relabel(int *excess, int *neighbors[4], int *heights, int width,
-        int height)
+__global__ void relabel(int *excess, int *heights, int *tmp_heights, int *up,
+        int *right, int *bottom, int *left, int width, int height, size_t pitch)
 {
     int x = blockDim.x * blockIdx.x + threadIdx.x;
     int y = blockDim.y * blockIdx.y + threadIdx.y;
@@ -29,32 +29,37 @@ __global__ void relabel(int *excess, int *neighbors[4], int *heights, int width,
         return;
 
     int idx = y * width + x;
-    if (excess[idx] <= 0 || heights[idx] >= HEIGHT_MAX)
+    if (*at(excess, x, y, pitch) <= 0 || *at(heights, x, y, pitch) >= HEIGHT_MAX)
         return;
-    
+    int *ptr = at(tmp_heights, x, y, pitch);
+
+    int *neighbors[4] = {up, right, bottom, left};
     int tmp_height = HEIGHT_MAX;
     for (int i = 0; i < 4; i++)
     {
-        int idx_nghb = (y + y_nghb[i]) * width + (x + x_nghb[i]);
-        if (neighbors[i][idx_nghb] > 0)
-            tmp_height = tmp_height > heights[idx_nghb] + 1 ? heights[idx_nghb] : tmp_height;
+        int new_x = x + x_nghb[i];
+        int new_y = y + y_nghb[i];
+        if (*at(neighbors[i], new_x, new_y, pitch) > 0)
+            tmp_height = min(tmp_height, *at(heights, new_x, new_y, pitch) + 1);
     }
-    heights[idx] = tmp_height;
+    *at(tmp_heights, x, y, pitch) = tmp_height;
 
 }
 
-__global__ void push(int *excess, int *neighbors[4], int *heights, int width, 
-        int height)
+__global__ void push(int *excess, int *heights, int *up, int *right,
+        int *bottom, int *left, int width, int height)
 {
     int x = blockDim.x * blockIdx.x + threadIdx.x;
     int y = blockDim.y * blockIdx.y + threadIdx.y;
 
     if (x >= width || y >= height)
         return;
-
+    printf("x:%d|y:%d", x,y);
     int idx = y * width + x;
     if (excess[idx] <= 0 || heights[idx] >= HEIGHT_MAX)
         return;
+
+    int *neighbors[4] = {up, right, bottom, left};
 
     for (auto i = 0; i < 4; i++) {
         auto idx_nghb = (y + y_nghb[i]) * width + (x + x_nghb[i]);
@@ -90,7 +95,6 @@ int *duplicate_on_gpu(int *vect, int width, int height, size_t &pitch)
 
     cudaMallocPitch(&array, &pitch, width * sizeof(int), height);
     cudaCheckError();
-    std::cout << "Pitch: "<<pitch<<std::endl;
     cudaMemcpy2D(array, pitch,
                  vect, width * sizeof(int),
                  width * sizeof(int), height, cudaMemcpyHostToDevice);
@@ -109,8 +113,8 @@ void max_flow_gpu(Graph graph)
     dim3 dimBlock(32, 32);
     dim3 dimGrid(w, h);
 
-    auto arr = graph._excess_flow;
-    std::cout << arr[0] << " " << arr[1] <<" "<<arr[2]<<std::endl
+    auto arr = graph._heights;
+    std::cout << std::endl<<arr[0] << " " << arr[1] <<" "<<arr[2]<<std::endl
         << arr[3] << " " << arr[4] <<" "<<arr[5]<<std::endl
         << arr[6] << " " << arr[7] <<" "<<arr[8]<<std::endl;
 
@@ -118,17 +122,20 @@ void max_flow_gpu(Graph graph)
     size_t pitch;
     int *excess = duplicate_on_gpu(graph._excess_flow, width, height, pitch);
     int *heights = duplicate_on_gpu(graph._heights, width, height, pitch);
-    int *tmp_heights;
+    int *tmp_heights = duplicate_on_gpu(graph._heights, width, height, pitch);
     int *up = duplicate_on_gpu(graph._neighbors[0], width, height, pitch);
     int *right = duplicate_on_gpu(graph._neighbors[1], width, height, pitch);
     int *bottom = duplicate_on_gpu(graph._neighbors[2], width, height, pitch);
     int *left = duplicate_on_gpu(graph._neighbors[3], width, height, pitch);
 
+    relabel<<<dimGrid, dimBlock>>>(excess, heights, tmp_heights, up, right, bottom, left,
+            width, height, pitch);
+
     // try if memory was well duplicated
     std::cout << pitch << std::endl;
     int *new_arr = new int[9]();
     cudaMemcpy2D(new_arr, width * sizeof(int),
-                 excess, pitch,
+                 tmp_heights, pitch,
                  width * sizeof(int), height, cudaMemcpyDeviceToHost);
     arr = new_arr;
     std::cout << arr[0] << " " << arr[1] <<" "<<arr[2]<<std::endl
