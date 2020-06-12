@@ -11,6 +11,10 @@
         }                                                                                 \
     }                                                                                     \
 
+__constant__ int x_nghb[4] = {0, 1, 0, -1}; // idx offset for x axis
+__constant__ int y_nghb[4] = {-1, 0, 1, 0}; // idx offset for y axis
+__constant__ int id_opp[4] = {2, 3, 0, 1};
+
 __device__ inline int* at(int *addr, int x, int y, int pitch) {
     return (int*)(char*)addr + pitch * y + x * sizeof(int);
 }
@@ -27,8 +31,7 @@ __global__ void relabel(int *excess, int *neighbors[4], int *heights, int width,
     int idx = y * width + x;
     if (excess[idx] <= 0 || heights[idx] >= HEIGHT_MAX)
         return;
-    const int x_nghb[4] = {0, 1, 0, -1}; // idx offset for x axis
-    const int y_nghb[4] = {-1, 0, 1, 0}; // idx offset for y axis
+    
     int tmp_height = HEIGHT_MAX;
     for (int i = 0; i < 4; i++)
     {
@@ -52,9 +55,6 @@ __global__ void push(int *excess, int *neighbors[4], int *heights, int width,
     int idx = y * width + x;
     if (excess[idx] <= 0 || heights[idx] >= HEIGHT_MAX)
         return;
-    const int x_nghb[4] = {0, 1, 0, -1}; // idx offset for x axis
-    const int y_nghb[4] = {-1, 0, 1, 0}; // idx offset for y axis
-    const int id_opp[4] = {2, 3, 0, 1};
 
     for (auto i = 0; i < 4; i++) {
         auto idx_nghb = (y + y_nghb[i]) * width + (x + x_nghb[i]);
@@ -84,7 +84,7 @@ __global__ void print_value(int *array, int pitch, int width, int height)
 }
 
 
-int *duplicate_on_gpu(int *vect, int width, int height, size_t pitch)
+int *duplicate_on_gpu(int *vect, int width, int height, size_t &pitch)
 {
     int *array;
 
@@ -109,6 +109,10 @@ void max_flow_gpu(Graph graph)
     dim3 dimBlock(32, 32);
     dim3 dimGrid(w, h);
 
+    auto arr = graph._excess_flow;
+    std::cout << arr[0] << " " << arr[1] <<" "<<arr[2]<<std::endl
+        << arr[3] << " " << arr[4] <<" "<<arr[5]<<std::endl
+        << arr[6] << " " << arr[7] <<" "<<arr[8]<<std::endl;
 
     // Allocate for gpu
     size_t pitch;
@@ -120,6 +124,16 @@ void max_flow_gpu(Graph graph)
     int *bottom = duplicate_on_gpu(graph._neighbors[2], width, height, pitch);
     int *left = duplicate_on_gpu(graph._neighbors[3], width, height, pitch);
 
+    // try if memory was well duplicated
+    std::cout << pitch << std::endl;
+    int *new_arr = new int[9]();
+    cudaMemcpy2D(new_arr, width * sizeof(int),
+                 excess, pitch,
+                 width * sizeof(int), height, cudaMemcpyDeviceToHost);
+    arr = new_arr;
+    std::cout << arr[0] << " " << arr[1] <<" "<<arr[2]<<std::endl
+        << arr[3] << " " << arr[4] <<" "<<arr[5]<<std::endl
+        << arr[6] << " " << arr[7] <<" "<<arr[8]<<std::endl;
 
    /* while ()
     {
