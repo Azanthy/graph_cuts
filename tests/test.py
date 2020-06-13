@@ -9,17 +9,34 @@ PATH_TO_DATASET = "../segmentation_dataset/"
 BUILD_FOLDER = "../build/"
 NAME_OF_EXEC = "graph_cuts"
 NUMBER_OF_TESTS = 4 # -1 to test the whole dataset
+GPU = True
 
 if __name__ == '__main__':
+    if not os.path.exists(PATH_TO_DATASET):
+        print("Error with dataset path")
+    if not os.path.exists(BUILD_FOLDER):
+        print("Error with build path")
+    exec_path = os.path.join(BUILD_FOLDER, NAME_OF_EXEC)
+    if not os.path.exists(exec_path):
+        print("Error with executable path")
     files = os.listdir(os.path.join(PATH_TO_DATASET, "inputs", "normal"))
     if NUMBER_OF_TESTS != -1:
         files = files[:NUMBER_OF_TESTS]
-    exec_path = os.path.join(BUILD_FOLDER, NAME_OF_EXEC)
+
     scores = []
+    if GPU:
+        print('Testing with GPU')
+    else:
+        print('Testing with CPU')
     for target_file in files:
         print("=======================================")
         print("Creating " + target_file)
-        os.system(exec_path + ' ' + 
+        if GPU:
+            os.system(exec_path + ' -g ' + 
+            os.path.join(PATH_TO_DATASET, "inputs", "normal", target_file) + ' ' +
+            os.path.join(PATH_TO_DATASET, "inputs", "marked", "marked_" + target_file))
+        else:
+            os.system(exec_path + ' ' +
             os.path.join(PATH_TO_DATASET, "inputs", "normal", target_file) + ' ' +
             os.path.join(PATH_TO_DATASET, "inputs", "marked", "marked_" + target_file))
         if os.path.exists("output.jpg"):

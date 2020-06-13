@@ -24,7 +24,7 @@ int parse_options(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
     if (argc < 3) {
-        std::cerr << "graph_cuts: should be ./graph_cut [-cg]<img> <seeds_img>" << std::endl;
+        std::cerr << "graph_cuts: should be ./graph_cut [-cg] <img> <seeds_img>" << std::endl;
         exit(-1);
     }
     int algo = parse_options(argc, argv);
