@@ -36,3 +36,6 @@ add_executable(bench
         src/gpu.cu
         )
 target_link_libraries(bench PRIVATE benchmark)
+
+add_custom_target(test COMMAND sh ../tests/test.sh
+    )
