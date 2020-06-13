@@ -8,7 +8,7 @@ import numpy as np
 PATH_TO_DATASET = "../segmentation_dataset/"
 BUILD_FOLDER = "../build/"
 NAME_OF_EXEC = "graph_cuts"
-NUMBER_OF_TESTS = 4 # -1 to test the whole dataset
+NUMBER_OF_TESTS = -1 # -1 to test the whole dataset
 GPU = True
 
 if __name__ == '__main__':

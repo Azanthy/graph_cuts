@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
         exit(-1);
     }
     int algo = parse_options(argc, argv);
-    auto graph = Graph(argv[optind], argv[optind+1], 400);
+    auto graph = Graph(argv[optind], argv[optind+1], 100);
     if (!algo)
         graph.max_flow();
     else
