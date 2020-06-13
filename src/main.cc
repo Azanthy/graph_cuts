@@ -28,13 +28,13 @@ int main(int argc, char *argv[])
         exit(-1);
     }
     int algo = parse_options(argc, argv);
-    std::cout << algo << std::endl;
-    std::cout << optind<<" "<< argv[optind]<<" "<< argv[optind+1]<<std::endl;
-    auto graph = Graph(argv[optind], argv[optind+1], 1000);
+    auto graph = Graph(argv[optind], argv[optind+1], 400);
     if (!algo)
         graph.max_flow();
     else
         max_flow_gpu(graph);
     graph.dfs();
     graph.print();
+    if (!algo)
+        graph.free();
 }

@@ -13,7 +13,7 @@
 class Graph {
 public:
     Graph(char *img, char *seeds, int height_max);
-    ~Graph();
+    ~Graph(){};
     void max_flow();
     void push(int x, int y);
     void relabel(int x, int y, int *heights);
@@ -21,6 +21,7 @@ public:
     bool any_active();
     void dfs();
     void print();
+    void free();
 
     float max_capacity(int x, int y);
     float gradient(int id1, int id2);

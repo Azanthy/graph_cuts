@@ -83,7 +83,7 @@ Graph::Graph(char *img, char *seeds, int height_max) {
     }
 }
 
-Graph::~Graph()
+void Graph::free()
 {
     stbi_image_free(this->_img);
     stbi_image_free(this->_labels);
