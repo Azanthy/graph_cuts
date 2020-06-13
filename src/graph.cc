@@ -11,7 +11,9 @@
 #include "graph.hh"
 
 #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image.h"
+#include "stb_image_write.h"
 
 #define HISTO_FACTOR 4
 #define HEIGHT_MAX 100
@@ -24,17 +26,6 @@ Graph::Graph(char *img, char *seeds, int height_max) {
     int n, tmp_w, tmp_h;
     unsigned char *data = stbi_load(img, &this->_width, &this->_height, &n, 0);
     unsigned char *labels = stbi_load(seeds, &tmp_w, &tmp_h, &n, 0);
-
-    size_t **bck_histo = new size_t*[3]();
-    size_t **obj_histo = new size_t*[3]();
-    float **norm_bck_histo = new float*[3]();
-    float **norm_obj_histo = new float*[3]();
-    for (auto i = 0; i < 3; i++) {
-        bck_histo[i] = new size_t[256/HISTO_FACTOR]();
-        obj_histo[i] = new size_t[256/HISTO_FACTOR]();
-        norm_bck_histo[i] = new float[256/HISTO_FACTOR]();
-        norm_obj_histo[i] = new float[256/HISTO_FACTOR]();
-    }
 
     this->_img = data;
     this->_labels = labels;
@@ -56,34 +47,16 @@ Graph::Graph(char *img, char *seeds, int height_max) {
         for (auto x = 0; x < this->_width; x++) {
             auto idx = y * this->_width + x;
             auto n_idx = y * this->_width * n + x * n;
-            // for (auto i = 0; i < 3; i++) {
-            //     // Histograms of size 256/4=64
-            //     if (labels[n_idx] > 220) { // Red color for background
-            //         bck_histo[i][data[n_idx+i]/HISTO_FACTOR] += 1;
-            //         total_bck++;
-            //         mean_bck[i] += data[n_idx+i];
-            //     }
-            //     if (labels[n_idx+2] > 220) { // Blue color for object
-            //         obj_histo[i][data[n_idx+i]/HISTO_FACTOR] += 1;
-            //         total_obj++;
-            //         mean_obj[i] += data[n_idx+i];
-            //         this->_dfs.push(idx);
-            //         this->_binary[idx] = true;
-            //     }
-            // }
+
             if (labels[n_idx] > 220) { // Red color for background
                 total_bck++;
-                for (auto i = 0; i < 3; i++) {
+                for (auto i = 0; i < 3; i++)
                     mean_bck[i] += data[n_idx+i];
-                    bck_histo[i][data[n_idx+i]/HISTO_FACTOR] += 1;
-                }
             }
             if (labels[n_idx+2] > 220) { // Blue color for object
                 total_obj++;
-                for (auto i = 0; i < 3; i++) {
+                for (auto i = 0; i < 3; i++)
                     mean_obj[i] += data[n_idx+i];
-                    obj_histo[i][data[n_idx+i]/HISTO_FACTOR] += 1;
-                }
                 this->_dfs.push(idx);
                 this->_binary[idx] = true;
             }
@@ -94,12 +67,6 @@ Graph::Graph(char *img, char *seeds, int height_max) {
         mean_obj[i] /= total_obj;
     }
 
-    // Compute histograms for external capacities
-    float sum_bck_histo = 0;
-    float sum_obj_histo = 0;
-    normalize_histo(bck_histo, obj_histo, norm_bck_histo, norm_obj_histo);
-
-    //Can be parallelize easily
     for (auto y = 0; y < this->_height; y++) {
         for (auto x = 0; x < this->_width; x++) {
             auto idx = y * this->_width + x;
@@ -108,38 +75,22 @@ Graph::Graph(char *img, char *seeds, int height_max) {
             // Initialize neighbors capacities
             initialize_node_capacities(x, y);
 
-            // float weight_src = 255 * BIN_VAL(norm_obj_histo, data, n_idx);
-            // float weight_snk = 255 * BIN_VAL(norm_bck_histo, data, n_idx);
             float weight_src = gradient(n_idx, mean_obj);
             float weight_snk = gradient(n_idx, mean_bck);
 
             this->_excess_flow[idx] = weight_src - weight_snk;
-            // if (labels[n_idx] > 220) {
-            //     this->_excess_flow[idx] = 0;
-            // }
-            // if (labels[n_idx+2] > 220) {
-            //     this->_excess_flow[idx] = 255;
-            // }
-
         }
     }
-
-    for (auto i=0; i<3;i++){
-        delete[] bck_histo[i];
-        delete[] obj_histo[i];
-        delete[] norm_bck_histo[i];
-        delete[] norm_obj_histo[i];
-    }
-    delete[] bck_histo;
-    delete[] obj_histo;
-    delete[] norm_bck_histo;
-    delete[] norm_obj_histo;
 }
 
 Graph::~Graph()
 {
-    //stbi_image_free(this->_img);
-    //stbi_image_free(this->_labels);
+    stbi_image_free(this->_img);
+    stbi_image_free(this->_labels);
+    delete[] _heights;
+    delete[] _excess_flow;
+    for (auto i = 0; i < 4; i++)
+        delete[] _neighbors[i];
 }
 
 void Graph::normalize_histo(size_t **bck_histo, size_t **obj_histo, float **norm_bck_histo,
@@ -285,21 +236,19 @@ void Graph::dfs() {
 }
 
 void Graph::print() {
-    std::ofstream file;
-    file.open("output.ppm");
-
-    file << "P3\n" << this->_width << " "<< this->_height << "\n255\n";
+    uint8_t *img = new uint8_t[_width * _height * 3]();
     for (int y = 0; y < this->_height; y++)
     {
         for (int x = 0; x < this->_width; x++)
         {
-            auto n_idx = y * this->_width * 3 + x * 3;
-            auto flow = this->_excess_flow[y*_width +x];
-            if (_binary[y*_width+x])
-                file << int(_img[n_idx]) << " " << int(_img[n_idx+1]) << " "<< int(_img[n_idx+2]) << " ";
-            else
-                file << "0 0 0 ";
+            int idx = y * _width + x;
+            if (_binary[idx]) {
+                img[idx*3]   = 255;
+                img[idx*3+1] = 255;
+                img[idx*3+2] = 255;
+            }
         }
-        file << "\n";
     }
+    stbi_write_jpg("output.jpg", _width, _height, 3, img, 100);
+    delete[] img;
 }
